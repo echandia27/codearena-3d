@@ -1,0 +1,4 @@
+.arena-container {
+  width: 100vw;  /* 100% del ancho de la ventana */
+  height: 100vh; /* 100% del alto de la ventana */
+}

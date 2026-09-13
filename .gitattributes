@@ -1,0 +1,2 @@
+# en la raíz de codearena-3d, crea el archivo .gitattributes con esta línea:
+* text=auto eol=lf
