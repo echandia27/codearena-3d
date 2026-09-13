@@ -1,4 +1,35 @@
 .arena-container {
-  width: 100vw;  /* 100% del ancho de la ventana */
-  height: 100vh; /* 100% del alto de la ventana */
+  position: relative; /* referencia para el HUD absoluto */
+  width: 100vw;
+  height: 100vh;
+}
+
+.hud {
+  position: absolute;
+  top: 16px;
+  left: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-family: 'Courier New', monospace;
+  color: #9ae6b4;
+  pointer-events: none; /* el HUD no roba clics ni teclas */
+  user-select: none;
+}
+
+.hud-position {
+  display: flex;
+  gap: 14px;
+  background: rgba(0, 0, 0, 0.55);
+  padding: 8px 12px;
+  border-radius: 6px;
+  border: 1px solid rgba(154, 230, 180, 0.3);
+}
+
+.hud-help {
+  font-size: 12px;
+  background: rgba(0, 0, 0, 0.55);
+  padding: 6px 10px;
+  border-radius: 6px;
+  color: rgba(255, 255, 255, 0.75);
 }

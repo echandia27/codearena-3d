@@ -4,8 +4,11 @@ import {
   ElementRef,
   OnDestroy,
   ViewChild,
+  inject,
+  signal,
 } from '@angular/core';
 import * as THREE from 'three';
+import { Controls } from '../services/controls';
 
 @Component({
   selector: 'app-arena',
@@ -18,21 +21,36 @@ export class Arena implements AfterViewInit, OnDestroy {
   @ViewChild('canvasContainer')
   private canvasContainer!: ElementRef<HTMLDivElement>;
 
+  // Angular inyecta la única instancia del servicio de teclado (DI)
+  private controls = inject(Controls);
+
   // --- Los 3 pilares de Three.js ---
   private scene = new THREE.Scene();
   private camera!: THREE.PerspectiveCamera;
   private renderer!: THREE.WebGLRenderer;
 
-  // --- Objetos del juego ---
+  // --- Jerarquía del drone ---
+  // drone: posición en el mundo + giro (yaw)
+  // tilt : hijo de drone; inclinación (pitch) + flotación visual
   private drone = new THREE.Group();
+  private tilt = new THREE.Group();
   private propellers: THREE.Mesh[] = [];
+
+  // --- Reglas del juego (algún día vivirán en el servidor) ---
+  private readonly SPEED = 8;          // unidades por segundo
+  private readonly ARENA_LIMIT = 18.5; // mitad de arena (20) menos margen
+  private readonly MIN_Y = 0.8;
+  private readonly MAX_Y = 8;
 
   // --- Loop de animación ---
   private clock = new THREE.Clock();
+  private elapsed = 0;
   private animationId = 0;
   private resizeObserver?: ResizeObserver;
 
-  // Angular llama esto cuando el HTML ya existe en pantalla
+  // Señal reactiva para el HUD (pública: el template la lee)
+  dronePosition = signal({ x: 0, y: 2, z: 0 });
+
   ngAfterViewInit(): void {
     this.setupRenderer();
     this.setupCamera();
@@ -43,7 +61,6 @@ export class Arena implements AfterViewInit, OnDestroy {
     this.setupResize();
   }
 
-  // Angular llama esto cuando el componente se destruye: limpiamos
   ngOnDestroy(): void {
     cancelAnimationFrame(this.animationId);
     this.resizeObserver?.disconnect();
@@ -61,48 +78,42 @@ export class Arena implements AfterViewInit, OnDestroy {
   private setupCamera(): void {
     const container = this.canvasContainer.nativeElement;
     const aspectRatio = container.clientWidth / container.clientHeight;
-    // PerspectiveCamera(fov, aspecto, cerca, lejos)
     this.camera = new THREE.PerspectiveCamera(60, aspectRatio, 0.1, 200);
-    this.camera.position.set(0, 15, 25);
+    // Vista aérea frontal: W aleja "hacia arriba" de la pantalla (se siente natural)
+    this.camera.position.set(0, 24, 26);
     this.camera.lookAt(0, 1, 0);
   }
 
   private setupLights(): void {
-    // Luz ambiental: ilumina todo por igual (suave)
     const ambient = new THREE.AmbientLight(0xffffff, 0.6);
     this.scene.add(ambient);
 
-    // Luz direccional: como un sol, viene de una dirección
     const sun = new THREE.DirectionalLight(0xffffff, 1.8);
     sun.position.set(10, 20, 10);
     this.scene.add(sun);
   }
 
   private setupArena(): void {
-    // Cielo y niebla (la niebla da profundidad)
     this.scene.background = new THREE.Color(0x0d1b2a);
     this.scene.fog = new THREE.Fog(0x0d1b2a, 40, 90);
 
-    // Piso
     const floor = new THREE.Mesh(
       new THREE.PlaneGeometry(40, 40),
-      new THREE.MeshStandardMaterial({ color: 0x1565c0 })
+      new THREE.MeshStandardMaterial({ color: 0x2e7d32 })
     );
-    floor.rotation.x = -Math.PI / 2; // el plano se crea acostado "de pie"; lo giramos
+    floor.rotation.x = -Math.PI / 2;
     this.scene.add(floor);
 
-    // Cuadrícula: ayuda a percibir movimiento y profundidad
     const grid = new THREE.GridHelper(40, 20, 0x0d1b2a, 0x1b5e20);
-    grid.position.y = 0.02; // levemente arriba del piso para que no se pelee con él
+    grid.position.y = 0.02;
     this.scene.add(grid);
 
-    // Paredes: [ancho, alto, profundidad, x, y, z]
     const wallMaterial = new THREE.MeshStandardMaterial({ color: 0x455a64 });
     const walls: Array<[number, number, number, number, number, number]> = [
-      [40.5, 3, 0.5,   0, 1.5, -20], // norte
-      [40.5, 3, 0.5,   0, 1.5,  20], // sur
-      [0.5,  3, 40.5, -20, 1.5,  0], // oeste
-      [0.5,  3, 40.5,  20, 1.5,  0], // este
+      [40.5, 3, 0.5,   0, 1.5, -20],
+      [40.5, 3, 0.5,   0, 1.5,  20],
+      [0.5,  3, 40.5, -20, 1.5,  0],
+      [0.5,  3, 40.5,  20, 1.5,  0],
     ];
     for (const [w, h, d, x, y, z] of walls) {
       const wall = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), wallMaterial);
@@ -112,23 +123,22 @@ export class Arena implements AfterViewInit, OnDestroy {
   }
 
   private setupDrone(): void {
-    // Cuerpo
+    // Las piezas viven ahora dentro de "tilt" para que la inclinación
+    // no afecte a la posición ni al giro (jerarquía de transformaciones)
     const body = new THREE.Mesh(
       new THREE.BoxGeometry(1, 0.3, 1),
       new THREE.MeshStandardMaterial({ color: 0x263238 })
     );
-    this.drone.add(body);
+    this.tilt.add(body);
 
-    // Brazos: dos barras cruzadas en diagonal (reutilizamos la misma geometría)
     const armGeometry = new THREE.BoxGeometry(1.7, 0.08, 0.12);
     const armMaterial = new THREE.MeshStandardMaterial({ color: 0x37474f });
     for (const angle of [Math.PI / 4, -Math.PI / 4]) {
       const arm = new THREE.Mesh(armGeometry, armMaterial);
       arm.rotation.y = angle;
-      this.drone.add(arm);
+      this.tilt.add(arm);
     }
 
-    // Hélices: láminas finas que girarán en el loop de animación
     const propGeometry = new THREE.BoxGeometry(0.8, 0.04, 0.1);
     const propMaterial = new THREE.MeshStandardMaterial({ color: 0xffca28 });
     const corners: Array<[number, number]> = [
@@ -137,36 +147,87 @@ export class Arena implements AfterViewInit, OnDestroy {
     for (const [x, z] of corners) {
       const propeller = new THREE.Mesh(propGeometry, propMaterial);
       propeller.position.set(x, 0.2, z);
-      this.propellers.push(propeller); // guardamos referencia para girarlas después
-      this.drone.add(propeller);
+      this.propellers.push(propeller);
+      this.tilt.add(propeller);
     }
 
-    this.drone.position.set(0, 2, 0); // vuela a altura 2, en el centro
+    this.drone.add(this.tilt);
+    this.drone.position.set(0, 2, 0);
     this.scene.add(this.drone);
   }
 
   private startAnimationLoop(): void {
     const animate = (): void => {
-      // Agenda el próximo frame (así se crea el ciclo de ~60fps)
       this.animationId = requestAnimationFrame(animate);
-      const t = this.clock.getElapsedTime(); // segundos desde que empezó
 
-      // Flotación suave: seno del tiempo = sube y baja
-      this.drone.position.y = 2 + Math.sin(t * 5) * 0.4;
-      // Giro lento sobre sí mismo
-      this.drone.rotation.y += 0.003;
-      // Hélices girando rápido
-      for (const propeller of this.propellers) {
-        propeller.rotation.y += 0.4;
-      }
+      const dt = this.clock.getDelta(); // segundos desde el frame anterior
+      this.elapsed += dt;
+
+      this.updateDrone(dt);
 
       this.renderer.render(this.scene, this.camera);
     };
     animate();
   }
 
+  private updateDrone(dt: number): void {
+    const smoothing = 1 - Math.exp(-10 * dt); // suavizado independiente del framerate
+
+    // 1) Intención del jugador: leer el estado del teclado
+    let vx = 0, vy = 0, vz = 0;
+    if (this.controls.isPressed('KeyW')) vz -= 1;
+    if (this.controls.isPressed('KeyS')) vz += 1;
+    if (this.controls.isPressed('KeyA')) vx -= 1;
+    if (this.controls.isPressed('KeyD')) vx += 1;
+    if (this.controls.isPressed('Space')) vy += 1;
+    if (this.controls.isPressed('ShiftLeft') || this.controls.isPressed('ShiftRight')) vy -= 1;
+
+    // 2) Normalizar: en diagonal no debe ir más rápido que en línea recta
+    const length = Math.hypot(vx, vy, vz);
+    const isMoving = length > 0;
+    if (isMoving) {
+      vx = (vx / length) * this.SPEED;
+      vy = (vy / length) * this.SPEED;
+      vz = (vz / length) * this.SPEED;
+    }
+
+    // 3) Mover (velocidad × dt) y respetar los límites de la arena
+    const p = this.drone.position;
+    p.x = THREE.MathUtils.clamp(p.x + vx * dt, -this.ARENA_LIMIT, this.ARENA_LIMIT);
+    p.y = THREE.MathUtils.clamp(p.y + vy * dt, this.MIN_Y, this.MAX_Y);
+    p.z = THREE.MathUtils.clamp(p.z + vz * dt, -this.ARENA_LIMIT, this.ARENA_LIMIT);
+
+    // 4) Girar hacia la dirección de movimiento (yaw, suavizado)
+    if (vx !== 0 || vz !== 0) {
+      const targetYaw = Math.atan2(vx, vz);
+      this.drone.rotation.y = this.lerpAngle(this.drone.rotation.y, targetYaw, smoothing);
+    }
+
+    // 5) Inclinar la nariz al avanzar, como un drone real (pitch)
+    const horizontalSpeed = Math.hypot(vx, vz);
+    const targetPitch = (horizontalSpeed / this.SPEED) * 0.35;
+    this.tilt.rotation.x += (targetPitch - this.tilt.rotation.x) * smoothing;
+
+    // 6) Detalles vivos: flotación visual + hélices más rápidas al moverse
+    this.tilt.position.y = Math.sin(this.elapsed * 3) * 0.08;
+    const spin = isMoving ? 0.9 : 0.4;
+    for (const propeller of this.propellers) {
+      propeller.rotation.y += spin;
+    }
+
+    // 7) Publicar la posición para el HUD
+    this.dronePosition.set({ x: p.x, y: p.y, z: p.z });
+  }
+
+  // Interpola entre dos ángulos siempre por el camino corto
+  private lerpAngle(current: number, target: number, t: number): number {
+    let diff = target - current;
+    while (diff > Math.PI) diff -= 2 * Math.PI;
+    while (diff < -Math.PI) diff += 2 * Math.PI;
+    return current + diff * t;
+  }
+
   private setupResize(): void {
-    // Si el usuario cambia el tamaño de la ventana, ajustamos cámara y canvas
     const container = this.canvasContainer.nativeElement;
     this.resizeObserver = new ResizeObserver(() => {
       const width = container.clientWidth;

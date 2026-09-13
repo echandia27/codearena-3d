@@ -1,1 +1,10 @@
-<div #canvasContainer class="arena-container"></div>
+<div #canvasContainer class="arena-container">
+  <div class="hud">
+    <div class="hud-position">
+      <span>X {{ dronePosition().x.toFixed(1) }}</span>
+      <span>Y {{ dronePosition().y.toFixed(1) }}</span>
+      <span>Z {{ dronePosition().z.toFixed(1) }}</span>
+    </div>
+    <div class="hud-help">W/A/S/D mover · SPACE subir · SHIFT bajar</div>
+  </div>
+</div>
