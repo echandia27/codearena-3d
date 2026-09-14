@@ -2,6 +2,7 @@ import {
   ConnectedSocket,
   MessageBody,
   OnGatewayDisconnect,
+  OnGatewayInit,
   SubscribeMessage,
   WebSocketGateway,
   WebSocketServer,
@@ -10,6 +11,11 @@ import { Logger, NotFoundException } from '@nestjs/common';
 import { Server, Socket } from 'socket.io';
 import { SalasService } from './salas.service';
 import { TEMAS_VALIDOS } from './salas.dto';
+import {
+  HABILIDADES_VALIDAS,
+  Habilidad,
+  PartidasService,
+} from '../partidas/partidas.service';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -42,22 +48,35 @@ function asegurarUuid(valor: unknown, campo: string): string {
   return valor;
 }
 
+function asegurarHabilidad(habilidad: unknown): Habilidad {
+  if (typeof habilidad !== 'string' || !HABILIDADES_VALIDAS.includes(habilidad as Habilidad)) {
+    throw new Error('Habilidad desconocida');
+  }
+  return habilidad as Habilidad;
+}
+
 /**
  * Gateway de Socket.IO: el canal en tiempo real del juego.
  * CORS abierto para desarrollo (Angular corre en :4200, la API en :3001).
  */
 @WebSocketGateway({ cors: { origin: '*' } })
-export class SalasGateway implements OnGatewayDisconnect {
+export class SalasGateway implements OnGatewayInit, OnGatewayDisconnect {
   private readonly logger = new Logger(SalasGateway.name);
 
   @WebSocketServer()
   server!: Server;
 
-  constructor(private readonly salasService: SalasService) {}
+  constructor(
+    private readonly salasService: SalasService,
+    private readonly partidas: PartidasService,
+  ) {}
+
+  /** El motor de combate necesita el server para difundir a las salas. */
+  afterInit(server: Server): void {
+    this.partidas.adjuntarServidor(server);
+  }
 
   // socket.id -> sesión del jugador en esa conexión.
-  // Nos permite saber a qué sala avisar cuando el socket se cae,
-  // y saber QUIÉN es cada socket sin fiarnos de lo que el cliente diga.
   private sesiones = new Map<string, { codigo: string; jugadorId: string }>();
 
   /** R9: si un jugador se desconecta, la partida sigue para los demás. */
@@ -68,7 +87,11 @@ export class SalasGateway implements OnGatewayDisconnect {
 
     this.logger.log(`Desconexión en sala ${sesion.codigo}`);
     await this.salasService.marcarConexion(sesion.jugadorId, false);
+    this.partidas.desconectarJugador(sesion.codigo, sesion.jugadorId);
     await this.emitirEstado(sesion.codigo);
+    if (this.partidas.hayPartida(sesion.codigo)) {
+      this.partidas['emitirEstado'](sesion.codigo);
+    }
   }
 
   /** Crea sala por WebSocket y conecta al emisor. */
@@ -92,7 +115,7 @@ export class SalasGateway implements OnGatewayDisconnect {
     }
   }
 
-  /** Une un jugador nuevo (pasa por la MISMA lógica transaccional R2/R3 del service). */
+  /** Une un jugador nuevo (misma lógica transaccional R2/R3 del service). */
   @SubscribeMessage('sala:unirse')
   async unirse(
     @ConnectedSocket() socket: Socket,
@@ -134,6 +157,10 @@ export class SalasGateway implements OnGatewayDisconnect {
       socket.join(codigo);
       await this.salasService.marcarConexion(jugadorId, true);
       await this.emitirEstado(codigo);
+      // Si hay partida en curso, el reconectado recibe HP/efectos al día
+      if (this.partidas.hayPartida(codigo)) {
+        this.partidas['emitirEstado'](codigo);
+      }
     } catch (error) {
       this.emitirError(socket, error);
     }
@@ -158,54 +185,116 @@ export class SalasGateway implements OnGatewayDisconnect {
       if (todosListos && data.sala.estado === 'WAITING') {
         await this.salasService.iniciarPartida(data.sala.id);
         await this.emitirEstado(codigo); // todos ven PLAYING antes del countdown
-        await this.cuentaRegresiva(codigo);
+        await this.cuentaRegresiva(codigo, data.sala.id, data.sala.tema, conectados.map((j) => j.id));
       }
     } catch (error) {
       this.logger.error(`Error en jugador:listo: ${error instanceof Error ? error.message : error}`);
     }
   }
 
-  /**
-   * Relé de posiciones (R8 — la parte de posición). El cliente solo dice
-   * {x,y,z}: el servidor ya sabe QUIÉN es (sesión) y en qué sala está,
-   * así que es estructuralmente imposible suplantar a otro jugador.
-   * Las posiciones son estado EFÍMERO: se retransmiten, jamás se guardan en BD.
-   */
+  /** R6 paso 1: pedir habilidad => recibir pregunta (sin la respuesta). */
+  @SubscribeMessage('habilidad:solicitar')
+  async solicitarHabilidad(
+    @ConnectedSocket() socket: Socket,
+    @MessageBody() body: { habilidad: unknown; objetivoId?: unknown },
+  ): Promise<void> {
+    const sesion = this.sesiones.get(socket.id);
+    if (!sesion) {
+      socket.emit('habilidad:error', { mensaje: 'No estás en una sala' });
+      return;
+    }
+    try {
+      const habilidad = asegurarHabilidad(body.habilidad);
+      const objetivoId =
+        typeof body.objetivoId === 'string' ? body.objetivoId : null;
+
+      const payload = await this.partidas.solicitarHabilidad(
+        sesion.codigo,
+        sesion.jugadorId,
+        habilidad,
+        objetivoId,
+      );
+      socket.emit('pregunta:nueva', payload);
+    } catch (error) {
+      // Incluye IaError de R5: mensaje entendible para el jugador
+      const mensaje = error instanceof Error ? error.message : 'Error inesperado';
+      socket.emit('habilidad:error', { mensaje });
+    }
+  }
+
+  /** R6 paso 2: responder => el servidor valida y aplica (o rechaza). */
+  @SubscribeMessage('pregunta:responder')
+  async responder(
+    @ConnectedSocket() socket: Socket,
+    @MessageBody() body: { preguntaId: unknown; indice: unknown },
+  ): Promise<void> {
+    const sesion = this.sesiones.get(socket.id);
+    if (!sesion) {
+      socket.emit('habilidad:error', { mensaje: 'No estás en una sala' });
+      return;
+    }
+    try {
+      const preguntaId = asegurarUuid(body.preguntaId, 'preguntaId');
+      const resultado = await this.partidas.responder(
+        sesion.codigo,
+        sesion.jugadorId,
+        preguntaId,
+        body.indice,
+      );
+      if (!resultado.correcta) {
+        socket.emit('habilidad:fallida', {
+          jugadorId: sesion.jugadorId,
+          habilidad: resultado.habilidad,
+          motivo: resultado.motivo,
+        });
+      }
+      // Si fue correcta, el service ya difundió habilidad:aplicada + estados
+    } catch (error) {
+      const mensaje = error instanceof Error ? error.message : 'Error inesperado';
+      socket.emit('habilidad:error', { mensaje });
+    }
+  }
+
+  /** Relé de posiciones (R8). El cliente solo dice {x,y,z}: identidad estampada aquí. */
   @SubscribeMessage('drone:posicion')
   posicion(
     @ConnectedSocket() socket: Socket,
     @MessageBody() body: { x: unknown; y: unknown; z: unknown },
   ): void {
     const sesion = this.sesiones.get(socket.id);
-    if (!sesion) return; // socket sin sesión registrada: ignorar
+    if (!sesion) return;
 
     const x = Number(body.x);
     const y = Number(body.y);
     const z = Number(body.z);
     if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(z)) return;
 
-    // socket.to(...) = a todos en la sala MENOS al emisor
-    // (él ya conoce su propia posición; no hace falta eco)
     socket.to(sesion.codigo).emit('drone:posicion', {
       jugadorId: sesion.jugadorId,
       x, y, z,
     });
   }
 
-  /** Difunde el estado completo a TODA la sala (R8). */
+  /** Difunde el estado completo de la sala a TODA la sala (R8). */
   private async emitirEstado(codigo: string): Promise<void> {
     const data = await this.salasService.obtenerPorCodigo(codigo);
     this.server.to(codigo).emit('sala:estado', data);
   }
 
-  /** 5...1 y arranca. La sala ya está en PLAYING: nadie más puede unirse. */
-  private async cuentaRegresiva(codigo: string): Promise<void> {
+  /** 5...1, arranca la arena y con ella el motor de combate. */
+  private async cuentaRegresiva(
+    codigo: string,
+    salaId: string,
+    tema: string,
+    jugadoresIds: string[],
+  ): Promise<void> {
     for (let segundos = 5; segundos >= 1; segundos--) {
       this.server.to(codigo).emit('cuenta:regresiva', { segundos });
       await new Promise((resolve) => setTimeout(resolve, 1000));
     }
     this.server.to(codigo).emit('partida:iniciada', {});
     this.logger.log(`Partida iniciada en sala ${codigo}`);
+    await this.partidas.iniciar(codigo, salaId, tema, jugadoresIds);
   }
 
   /** El error va SOLO al cliente que lo provocó, nunca a toda la sala. */
