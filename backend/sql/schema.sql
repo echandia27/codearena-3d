@@ -1,5 +1,5 @@
 -- ============================================================
--- CodeArena 3D — Esquema de base de datos (Sesión 3A)
+-- CodeArena 3D — Esquema de base de datos (Sesión 3B)
 -- Ejecutar en Supabase > SQL Editor para recrear la BD completa.
 --
 -- Notas de arquitectura:
@@ -8,6 +8,7 @@
 --   de conexión Postgres (rol administrador, no afectado por RLS).
 -- - UNIQUE(sala_id, slot): regla R3 — la base de datos misma
 --   impide físicamente un 5° jugador por sala.
+-- - columna 'listo': marca de preparación para iniciar partida.
 -- ============================================================
 
 DROP TABLE IF EXISTS jugadores;
@@ -29,6 +30,7 @@ CREATE TABLE jugadores (
   sala_id UUID NOT NULL REFERENCES salas(id) ON DELETE CASCADE,
   nickname VARCHAR(16) NOT NULL,
   conectado BOOLEAN NOT NULL DEFAULT true,
+  listo BOOLEAN NOT NULL DEFAULT false,
   puntaje INT NOT NULL DEFAULT 0,
   slot INT NOT NULL,
   -- R3: defensa a nivel de BD — solo caben 4 slots por sala

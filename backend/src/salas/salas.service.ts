@@ -134,7 +134,7 @@ export class SalasService {
     }
   }
 
-  /** Estado completo de la sala (lo leerá el lobby en la Sesión 3B). */
+  /** Estado completo de la sala: la fuente de verdad que difunde el gateway. */
   async obtenerPorCodigo(codigo: string) {
     const salaRes = await this.db.pool.query(
       `SELECT * FROM salas WHERE codigo = $1`,
@@ -144,10 +144,41 @@ export class SalasService {
       throw new NotFoundException(`Sala ${codigo} no encontrada`);
     }
     const jugadoresRes = await this.db.pool.query(
-      `SELECT id, nickname, slot, conectado, puntaje
+      `SELECT id, nickname, slot, conectado, listo, puntaje
          FROM jugadores WHERE sala_id = $1 ORDER BY slot`,
       [salaRes.rows[0].id],
     );
     return { sala: salaRes.rows[0], jugadores: jugadoresRes.rows };
+  }
+
+  /** R9: marca la conexión de un jugador (true al conectar, false al caer). */
+  async marcarConexion(jugadorId: string, conectado: boolean): Promise<void> {
+    await this.db.pool.query(
+      `UPDATE jugadores SET conectado = $2 WHERE id = $1`,
+      [jugadorId, conectado],
+    );
+  }
+
+  /** Marca a un jugador como "Listo" para empezar. */
+  async marcarListo(jugadorId: string): Promise<void> {
+    const res = await this.db.pool.query(
+      `UPDATE jugadores SET listo = true WHERE id = $1`,
+      [jugadorId],
+    );
+    if (res.rowCount === 0) {
+      throw new NotFoundException('Jugador no encontrado');
+    }
+  }
+
+  /**
+   * WAITING → PLAYING. Nunca hacia atrás (sección 5 del enunciado).
+   * El "AND estado = 'WAITING'" hace la operación idempotente: aunque
+   * se llame dos veces por carrera, el estado no se toca dos veces.
+   */
+  async iniciarPartida(salaId: string): Promise<void> {
+    await this.db.pool.query(
+      `UPDATE salas SET estado = 'PLAYING' WHERE id = $1 AND estado = 'WAITING'`,
+      [salaId],
+    );
   }
 }
