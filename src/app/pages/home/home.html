@@ -1,0 +1,43 @@
+<div class="home">
+  <h1 class="titulo">Code<span>Arena</span> 3D</h1>
+  <p class="subtitulo">Drones, preguntas de tecnología y combate por la arena</p>
+
+  @if (session.error()) {
+    <div class="error">{{ session.error() }}</div>
+  }
+
+  <div class="tarjetas">
+    <section class="tarjeta">
+      <h2>Crear sala</h2>
+
+      <label for="nick-crear">Tu nickname</label>
+      <input id="nick-crear" #nickname maxlength="16" placeholder="ej: Neo" />
+
+      <label for="tema-select">Tema tecnológico de la sala</label>
+      <select id="tema-select" #tema>
+        @for (t of temas; track t) {
+          <option [value]="t">{{ t }}</option>
+        }
+      </select>
+
+      <button (click)="crear(nickname, tema)">Crear y entrar</button>
+    </section>
+
+    <section class="tarjeta">
+      <h2>Unirse a una sala</h2>
+
+      <label for="nick-unir">Tu nickname</label>
+      <input id="nick-unir" #nickname2 maxlength="16" placeholder="ej: Trinity" />
+
+      <label for="codigo-input">Código de la sala</label>
+      <input id="codigo-input" #codigo maxlength="4" placeholder="ej: VBGT" class="input-codigo" />
+
+      <button (click)="unirse(codigo, nickname2)">Unirme</button>
+    </section>
+  </div>
+
+  <p class="pista">
+    Para probar el multijugador: crea una sala aquí y abre esta misma página en
+    otra pestaña para unirte con otro nickname.
+  </p>
+</div>

@@ -1,0 +1,5 @@
+/* App solo decide qué vista mostrar; cada componente gestiona su layout */
+:host {
+  display: block;
+  height: 100%;
+}

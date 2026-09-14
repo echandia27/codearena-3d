@@ -1,0 +1,115 @@
+.lobby {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #0d1b2a;
+  color: #e0e0e0;
+  font-family: 'Segoe UI', system-ui, sans-serif;
+  padding: 24px;
+}
+
+.tarjeta {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(154, 230, 180, 0.25);
+  border-radius: 12px;
+  padding: 28px;
+  width: 420px;
+  max-width: 100%;
+}
+
+.etiqueta {
+  margin: 0;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.cabecera {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.codigo {
+  font-size: 40px;
+  font-weight: 700;
+  letter-spacing: 8px;
+  color: #9ae6b4;
+  font-family: 'Courier New', monospace;
+}
+
+.boton-secundario {
+  background: transparent;
+  border: 1px solid rgba(154, 230, 180, 0.4);
+  color: #9ae6b4;
+  border-radius: 6px;
+  padding: 8px 12px;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.tema { color: rgba(255, 255, 255, 0.7); }
+
+.error {
+  background: rgba(229, 115, 115, 0.15);
+  border: 1px solid rgba(229, 115, 115, 0.5);
+  color: #fc8181;
+  padding: 10px 16px;
+  border-radius: 8px;
+  margin: 12px 0;
+}
+
+.jugadores {
+  list-style: none;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.jugadores li {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: rgba(255, 255, 255, 0.04);
+  border-radius: 8px;
+  padding: 10px 14px;
+}
+
+.jugadores li.desconectado { opacity: 0.45; }
+
+.slot {
+  color: rgba(255, 255, 255, 0.45);
+  font-family: 'Courier New', monospace;
+}
+
+.nombre { font-weight: 600; flex: 1; }
+
+.estado { font-size: 13px; color: #9ae6b4; }
+
+.boton-listo {
+  width: 100%;
+  margin-top: 16px;
+  background: #9ae6b4;
+  color: #0d1b2a;
+  border: none;
+  border-radius: 8px;
+  padding: 14px;
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.boton-listo:disabled {
+  background: rgba(154, 230, 180, 0.25);
+  cursor: default;
+}
+
+.pista {
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.5);
+  margin-top: 16px;
+}

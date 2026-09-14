@@ -1,1 +1,12 @@
-<app-arena />
+@if (session.vista() === 'home') {
+  <app-home />
+}
+@if (session.vista() === 'lobby') {
+  <app-lobby />
+}
+@if (session.vista() === 'arena') {
+  <app-arena />
+}
+@if (session.vista() === 'resultados') {
+  <app-resultados />
+}

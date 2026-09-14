@@ -1,0 +1,33 @@
+<div class="resultados">
+  <div class="tarjeta">
+    @if (session.resultadoFinal(); as r) {
+      @if (r.ganador) {
+        <div class="trofeo">🏆</div>
+        <h1><span>{{ r.ganador }}</span> gana la arena</h1>
+      } @else {
+        <div class="trofeo">🤝</div>
+        <h1>Empate</h1>
+      }
+
+      <p class="razon">
+        @if (r.razon === 'puntos') {
+          Alcanzó los 100 puntos primero
+        } @else {
+          Se acabaron los 5 minutos: mayor puntaje
+        }
+      </p>
+
+      <h2>Marcador final</h2>
+      <ul class="marcador">
+        @for (p of r.puntajes; track p.nickname) {
+          <li [class.campeon]="r.ganador === p.nickname">
+            <span>{{ p.nickname }}</span>
+            <strong>{{ p.puntaje }} pts</strong>
+          </li>
+        }
+      </ul>
+    }
+
+    <button class="boton-inicio" (click)="volverAlInicio()">Volver al inicio</button>
+  </div>
+</div>

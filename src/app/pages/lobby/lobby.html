@@ -1,0 +1,50 @@
+<div class="lobby">
+  <div class="tarjeta">
+    <p class="etiqueta">Sala</p>
+    <div class="cabecera">
+      <span class="codigo">{{ session.sala()?.codigo }}</span>
+      <button class="boton-secundario" (click)="copiarCodigo()">Copiar código</button>
+    </div>
+
+    <p class="tema">Tema: <strong>{{ session.sala()?.tema }}</strong></p>
+
+    @if (session.error()) {
+      <div class="error">{{ session.error() }}</div>
+    }
+
+    <h2>Jugadores ({{ session.jugadores().length }}/{{ session.sala()?.capacidad_maxima }})</h2>
+
+    <ul class="jugadores">
+      @for (j of session.jugadores(); track j.id) {
+        <li [class.desconectado]="!j.conectado">
+          <span class="slot">#{{ j.slot + 1 }}</span>
+          <span class="nombre">{{ j.nickname }}</span>
+          <span class="estado">
+            @if (j.listo) {
+              ✅ Listo
+            } @else if (!j.conectado) {
+              ⚠️ desconectado
+            }
+          </span>
+        </li>
+      }
+    </ul>
+
+    <button
+      class="boton-listo"
+      [disabled]="session.jugadorPropio()?.listo"
+      (click)="marcarListo()"
+    >
+      @if (session.jugadorPropio()?.listo) {
+        ✅ Listo — esperando a los demás…
+      } @else {
+        Marcar Listo
+      }
+    </button>
+
+    <p class="pista">
+      Cuando TODOS los conectados estén listos, comienza la cuenta regresiva de
+      5 segundos y la arena se abre.
+    </p>
+  </div>
+</div>

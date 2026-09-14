@@ -1,9 +1,12 @@
 .arena-container {
-  position: relative; /* referencia para el HUD absoluto */
+  position: relative;
   width: 100vw;
   height: 100vh;
+  overflow: hidden;
+  font-family: 'Segoe UI', system-ui, sans-serif;
 }
 
+/* ---------- HUD identidad ---------- */
 .hud {
   position: absolute;
   top: 16px;
@@ -11,19 +14,36 @@
   display: flex;
   flex-direction: column;
   gap: 8px;
-  font-family: 'Courier New', monospace;
   color: #9ae6b4;
-  pointer-events: none; /* el HUD no roba clics ni teclas */
+  pointer-events: none;
   user-select: none;
 }
 
-.hud-position {
+.hud-jugador {
   display: flex;
-  gap: 14px;
+  align-items: center;
+  gap: 10px;
   background: rgba(0, 0, 0, 0.55);
   padding: 8px 12px;
   border-radius: 6px;
   border: 1px solid rgba(154, 230, 180, 0.3);
+  width: fit-content;
+}
+
+.hud-nick { font-weight: 700; }
+
+.hud-hp {
+  font-family: 'Courier New', monospace;
+  color: #fff;
+}
+
+.hud-vuelo {
+  font-size: 11px;
+  background: #9ae6b4;
+  color: #0d1b2a;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-weight: 700;
 }
 
 .hud-help {
@@ -32,4 +52,266 @@
   padding: 6px 10px;
   border-radius: 6px;
   color: rgba(255, 255, 255, 0.75);
+  width: fit-content;
+}
+
+/* ---------- Marcador en vivo ---------- */
+.hud-score {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  pointer-events: none;
+  user-select: none;
+  min-width: 220px;
+}
+
+.score-fila {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(0, 0, 0, 0.55);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 6px;
+  padding: 6px 10px;
+}
+
+.score-fila.yo { border-color: rgba(154, 230, 180, 0.6); }
+.score-fila.muerto { opacity: 0.45; }
+
+.score-nick {
+  font-weight: 700;
+  min-width: 70px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.hp-bar {
+  flex: 1;
+  height: 8px;
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.hp-fill {
+  height: 100%;
+  background: #66bb6a;
+  transition: width 0.25s ease;
+}
+
+.hp-fill.baja { background: #ef5350; }
+
+.score-pts {
+  font-size: 12px;
+  font-family: 'Courier New', monospace;
+  color: #9ae6b4;
+}
+
+/* ---------- Barra de habilidades ---------- */
+.skills {
+  position: absolute;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 12px;
+}
+
+.skill {
+  font-size: 16px;
+  font-weight: 700;
+  padding: 14px 22px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  cursor: pointer;
+  color: #fff;
+  transition: transform 0.1s ease;
+}
+
+.skill:hover:not(:disabled) { transform: translateY(-2px); }
+.skill:disabled { opacity: 0.4; cursor: default; }
+
+.skill.boost { background: rgba(255, 202, 40, 0.25); }
+.skill.shield { background: rgba(79, 195, 247, 0.25); }
+.skill.attack { background: rgba(239, 83, 80, 0.3); }
+
+.objetivos {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: rgba(0, 0, 0, 0.7);
+  border: 1px solid rgba(239, 83, 80, 0.5);
+  border-radius: 10px;
+  padding: 10px 14px;
+}
+
+.objetivos-titulo { color: #fff; font-size: 14px; }
+
+.objetivo {
+  background: rgba(239, 83, 80, 0.3);
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 8px;
+  padding: 8px 14px;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.objetivo.cancelar { background: rgba(255, 255, 255, 0.12); }
+
+/* ---------- Modal de pregunta ---------- */
+.modal-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(13, 27, 42, 0.75);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.modal-caja {
+  background: #101f2e;
+  border: 1px solid rgba(154, 230, 180, 0.4);
+  border-radius: 14px;
+  padding: 24px;
+  width: 560px;
+  max-width: calc(100vw - 40px);
+}
+
+.modal-cabecera {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.modal-habilidad {
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  font-size: 12px;
+  color: #9ae6b4;
+  font-weight: 700;
+}
+
+.modal-timer {
+  font-family: 'Courier New', monospace;
+  font-size: 24px;
+  font-weight: 700;
+  color: #fff;
+}
+
+.modal-timer.urgente { color: #ef5350; }
+
+.modal-barra {
+  height: 6px;
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 999px;
+  overflow: hidden;
+  margin-bottom: 16px;
+}
+
+.modal-barra-fill {
+  height: 100%;
+  background: #9ae6b4;
+  transition: width 1s linear;
+}
+
+.modal-enunciado {
+  color: #fff;
+  font-size: 17px;
+  line-height: 1.5;
+  margin: 0 0 16px;
+}
+
+.modal-opciones {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.modal-opciones button {
+  text-align: left;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 8px;
+  color: #e0e0e0;
+  padding: 12px 14px;
+  font-size: 15px;
+  cursor: pointer;
+}
+
+.modal-opciones button:hover {
+  border-color: #9ae6b4;
+  background: rgba(154, 230, 180, 0.08);
+}
+
+/* ---------- Overlays ---------- */
+.cuenta-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background: rgba(13, 27, 42, 0.7);
+  pointer-events: none;
+  font-family: 'Courier New', monospace;
+}
+
+.cuenta-numero {
+  font-size: 140px;
+  font-weight: 800;
+  color: #9ae6b4;
+  line-height: 1;
+}
+
+.cuenta-texto {
+  color: rgba(255, 255, 255, 0.8);
+  letter-spacing: 2px;
+}
+
+.respawn-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  background: rgba(80, 10, 10, 0.45);
+  pointer-events: none;
+}
+
+.respawn-titulo {
+  font-size: 36px;
+  font-weight: 800;
+  color: #ef5350;
+  letter-spacing: 3px;
+}
+
+.respawn-contador {
+  font-size: 60px;
+  font-weight: 800;
+  color: #fff;
+  font-family: 'Courier New', monospace;
+}
+
+.respawn-texto { color: rgba(255, 255, 255, 0.8); }
+
+.aviso {
+  position: absolute;
+  top: 80px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(239, 83, 80, 0.2);
+  border: 1px solid rgba(239, 83, 80, 0.5);
+  color: #fc8181;
+  padding: 10px 18px;
+  border-radius: 8px;
+  pointer-events: none;
 }

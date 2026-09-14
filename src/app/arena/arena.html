@@ -1,10 +1,102 @@
 <div #canvasContainer class="arena-container">
-  <div class="hud">
-    <div class="hud-position">
-      <span>X {{ dronePosition().x.toFixed(1) }}</span>
-      <span>Y {{ dronePosition().y.toFixed(1) }}</span>
-      <span>Z {{ dronePosition().z.toFixed(1) }}</span>
+  <!-- Cuenta regresiva -->
+  @if (session.cuentaRegresiva() !== null) {
+    <div class="cuenta-overlay">
+      <div class="cuenta-numero">{{ session.cuentaRegresiva() }}</div>
+      <div class="cuenta-texto">LA ARENA SE ABRE…</div>
     </div>
-    <div class="hud-help">W/A/S/D mover · SPACE subir · SHIFT bajar</div>
+  }
+
+  <!-- Respawn -->
+  @if (miMuerto()) {
+    <div class="respawn-overlay">
+      <div class="respawn-titulo">FUERA DE COMBATE</div>
+      <div class="respawn-contador">{{ respawnSegundos() }}</div>
+      <div class="respawn-texto">reapareciendo… (−25 pts)</div>
+    </div>
+  }
+
+  <!-- Modal de pregunta (R6): cierra solo con habilidad:aplicada/fallida -->
+  @if (session.preguntaActual(); as p) {
+    <div class="modal-overlay">
+      <div class="modal-caja">
+        <div class="modal-cabecera">
+          <span class="modal-habilidad">⚡ {{ p.habilidad }}</span>
+          <span class="modal-timer" [class.urgente]="segundosPregunta() <= 5">
+            {{ segundosPregunta() }}s
+          </span>
+        </div>
+        <div class="modal-barra">
+          <div class="modal-barra-fill" [style.width.%]="(segundosPregunta() / 20) * 100"></div>
+        </div>
+        <p class="modal-enunciado">{{ p.enunciado }}</p>
+        <div class="modal-opciones">
+          @for (op of p.opciones; track $index) {
+            <button (click)="responder($index)">{{ op }}</button>
+          }
+        </div>
+      </div>
+    </div>
+  }
+
+  <!-- Aviso de habilidad (fallo/error con mensaje del servidor) -->
+  @if (session.avisoHabilidad(); as aviso) {
+    <div class="aviso">{{ aviso }}</div>
+  }
+
+  <!-- HUD: identidad + posición -->
+  <div class="hud">
+    <div class="hud-jugador">
+      <span class="hud-nick">{{ session.jugadorPropio()?.nickname }}</span>
+      <span class="hud-hp">HP {{ miHp() }}</span>
+      @if (session.partidaIniciada()) {
+        <span class="hud-vuelo">EN VUELO</span>
+      }
+    </div>
+    <div class="hud-help">W/A/S/D · SPACE · SHIFT · habilidades abajo</div>
+  </div>
+
+  <!-- Marcador en vivo (R8): HP + puntaje de todos -->
+  <div class="hud-score">
+    @for (j of session.jugadores(); track j.id) {
+      <div
+        class="score-fila"
+        [class.yo]="j.id === session.jugadorPropio()?.id"
+        [class.muerto]="estaMuerto(j.id)"
+      >
+        <span class="score-nick" [style.color]="colorDe(j.slot)">{{ j.nickname }}</span>
+        <div class="hp-bar">
+          <div
+            class="hp-fill"
+            [style.width.%]="hpDe(j.id)"
+            [class.baja]="hpDe(j.id) <= 25"
+          ></div>
+        </div>
+        <span class="score-pts">{{ j.puntaje }} pts</span>
+      </div>
+    }
+  </div>
+
+  <!-- Barra de habilidades (R6: pedir => pregunta => efecto) -->
+  <div class="skills">
+    @if (elegirObjetivo()) {
+      <div class="objetivos">
+        <span class="objetivos-titulo">🎯 Elige tu objetivo:</span>
+        @for (j of objetivosPosibles(); track j.id) {
+          <button class="objetivo" (click)="atacar(j.id)">{{ j.nickname }}</button>
+        }
+        <button class="objetivo cancelar" (click)="elegirObjetivo.set(false)">Cancelar</button>
+      </div>
+    } @else {
+      <button class="skill boost" (click)="pedir('boost')" [disabled]="!session.partidaIniciada() || miMuerto()">
+        ⚡ Boost
+      </button>
+      <button class="skill shield" (click)="pedir('shield')" [disabled]="!session.partidaIniciada() || miMuerto()">
+        🛡 Shield
+      </button>
+      <button class="skill attack" (click)="pedir('attack')" [disabled]="!session.partidaIniciada() || miMuerto()">
+        🎯 Attack
+      </button>
+    }
   </div>
 </div>
